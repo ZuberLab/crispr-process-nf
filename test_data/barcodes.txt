@@ -1,0 +1,7 @@
+lane	sample_name	barcode
+test_lane_1	test_sample_1	CCCA
+test_lane_1	test_sample_2	CCTC
+test_lane_1	test_sample_3	GGTG
+test_lane_2	test_sample_4	CCCA
+test_lane_2	test_sample_5	CCTC
+test_lane_2	test_sample_6	GGTG
