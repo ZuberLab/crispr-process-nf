@@ -9,3 +9,8 @@ nextflow run main.nf \
     --barcodes test_data/barcodes.txt \
     --inputDir test_data/01_raw \
     --outputDir test_output
+
+OBSERVED='test_output/counts/library/counts_mageck.txt'
+EXPECTED='test_data/expected_output.txt'
+cmp --silent ${EXPECTED} ${OBSERVED} && \
+    echo '--> SUCCESS: Expected Results!' || echo '--> FAILED: Inconsistent Results!'
