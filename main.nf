@@ -7,6 +7,8 @@ def helpMessage() {
     ================================================================
      DESCRIPTION
 
+     Process CRISPR and shRNA functional genetic screening data. 
+
      Usage:
      nextflow run zuberlab/crispr-process-nf
 

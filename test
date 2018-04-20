@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-PROFILE=${1:-ii2}
+PROFILE=${1:-singularity}
 echo "Using profile ${PROFILE}."
 
 nextflow run main.nf \
