@@ -72,7 +72,7 @@ for lane in demuxS.keys():
         laneout = os.path.join(args.outputdir, lane)
         try:
             os.makedirs(laneout)
-        except OSError:
+        except OSError:   # path already exists
             pass
         file = lane + '_' + demuxS[lane][barcode] + '.fastq'
         fqOut[demuxS[lane][barcode]] = open(os.path.join(laneout, file), "w")
@@ -86,11 +86,21 @@ for lane in demuxS.keys():
 # Scan BAM/SAM stream
 #####################
 
+# Anchor
+
+# Demultiplex
+
+# Trim
+
+# Write
+
+
 #SeqIO.write(sequences, output_handle, "fastq")
 
 # Close output files
 ####################
-#bam.close()
+for file in fqOut:
+    file.close()
 
 
 
