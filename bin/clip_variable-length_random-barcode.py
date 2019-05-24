@@ -75,7 +75,7 @@ for lane in demuxS.keys():
         except OSError:
             pass
         file = lane + '_' + demuxS[lane][barcode] + '.fastq'
-        fqOut[demuxS[lane][barcode]] = open(os.path(args.outputdir, laneout, file), "w")
+        fqOut[demuxS[lane][barcode]] = open(os.path.join(laneout, file), "w")
 
 
 
