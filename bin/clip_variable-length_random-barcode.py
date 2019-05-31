@@ -52,7 +52,7 @@ args = parser.parse_args()
 demuxS = dict()  # demuxS[barcode] = sample
 spacerP = list() # spacerP = [positions]
 demuxB = dict()  # demuxB[position] = barcode
-withPos=False    # Explicit barcode positions available
+withPos = False  # Explicit anchor positions available
 
 # Parse barcodes
 if args.barcodes:
@@ -116,22 +116,11 @@ for r in sys.stdin:
 
     # Anchor
     if withPos:     # With fixed positions
-        # Scan through the barcodes. Stop at the first one that matches.
-        for pos in demuxB.keys():
-            for bc in demuxB[pos]:
-                if hamming(bc, seq[pos:(pos+len(bc))]) <= args.bcmm:
-                    # Match the spacer.
-                    anchorPos = pos + args.anchorOffset
-                    if not args.anchorRegex:
-                        if hamming(args.anchorSeq, seq[anchorPos:(anchorPos + anchorLen)]) <= args.smm:
-                            # Valid anchor
-                            pass
-                            # TODO
-                    else:
-                        m <- anchor.match(seq[anchorPos:(anchorPos + anchorLen)])
-
-
-        m = anchor.match(seq[ ()-1 : ])    # Match beginning at the specified position
+        # Scan through the positions and try to match the anchor.
+        for pos in spacerP:
+            if hamming(args.anchorSeq, seq[pos:(pos+anchorLen)] <= args.smm:
+                
+                break
 
     # without positions
 
