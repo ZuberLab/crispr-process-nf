@@ -2,21 +2,22 @@
 
 ################################################################################
 # Demultiplex based on and then clip variable-length barcode region.
+#
 # The region is assumed to consist of 3 parts:
 # a random N-mer at the beginning, a demultiplexing barcode, and a fixed-sequence spacer.
 # The sgRNA sequence follows immediately after this region.
 #
-# The spacer is used as anchor for finding the demultiplexing barcodes, then entire
-# region before the sgRNA gets clipped off.
+# The spacer is used as anchor to identify the variable position of the demultiplexing barcodes, 
+# then the entire region before the sgRNA gets clipped off.
 #
-# Input from an uncompressed SAM stdin stream.
-# Output to multiple FASTQ files, one per sample defined in the barcodes table.
+# Input from a BAM file.
+# Output to multiple FASTQ files.
 #
 # part of CRISPR / shRNA screen pre-processing pipeline
 #
 # Kimon Froussios
 # Institute of Molecular Pathology (IMP), Vienna, Austria
-# 2019/05/23
+# 2019/06/05
 ################################################################################
 
 import sys, os, re, string, csv
