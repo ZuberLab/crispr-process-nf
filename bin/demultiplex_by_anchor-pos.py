@@ -103,8 +103,8 @@ if len(demuxS) == 0:
 # Open output files
 ###################
 fqOut = dict()
+laneout = os.path.join(args.outputdir, lane)
 for barcode in demuxS.keys():
-    laneout = os.path.join(args.outputdir, lane)
     try:
         os.makedirs(laneout)
     except OSError:   # path already exists. Hopefully you have permission to write where you want to, so that won't be the cause.
