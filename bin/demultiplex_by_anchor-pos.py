@@ -67,34 +67,33 @@ demuxB = dict()  # demuxB[position] = [barcodes]
 withPos = False  # Explicit anchor positions provided
 
 # Parse barcodes
-if args.barcodes:
-    with open(args.barcodes, "rt") as bcFile:
-        csvreader = csv.DictReader(bcFile, delimiter="\t")
-        for i, row in enumerate(csvreader):
-            if i == 0:
-                if not ("lane" in row.keys() or "sample_name" in row.keys() or "barcode" in row.keys()):
-                    raise Exception("Error: 'lane', 'sample_name', or 'barcode' field is missing from the barcodes table.")
-                if 'position' in row.keys():
-                    withPos = True              # Spacer start positions have been defined.
-            if row['lane'] == lane or row['lane'] == lane + '.bam':    # Only interested in the details for the lane being demultiplexed by this instance of the script.
-                demuxS[ row['barcode'] ] = row['sample_name']
-                if withPos:
-                    pos = int(row['position']) - 1  # 0-based indexing
-                    if pos < 0:
-                        raise ValueError(' '.join("Invalid barcode position definition for", row['lane'], row['barcode'], row['sample_name']))
+with open(args.barcodes, "rt") as bcFile:
+    csvreader = csv.DictReader(bcFile, delimiter="\t")
+    for i, row in enumerate(csvreader):
+        if i == 0:
+            if not ("lane" in row.keys() or "sample_name" in row.keys() or "barcode" in row.keys()):
+                raise Exception("Error: 'lane', 'sample_name', or 'barcode' field is missing from the barcodes table.")
+            if 'position' in row.keys():
+                withPos = True              # Spacer start positions have been defined.
+        if row['lane'] == lane or row['lane'] == lane + '.bam':    # Only interested in the details for the lane being demultiplexed by this instance of the script.
+            demuxS[ row['barcode'] ] = row['sample_name']
+            if withPos:
+                pos = int(row['position']) - 1  # 0-based indexing
+                if pos < 0:
+                    raise ValueError(' '.join("Invalid barcode position definition for", row['lane'], row['barcode'], row['sample_name']))
+                if pos not in spacerP:
+                    spacerP.append(pos)
+                if pos not in demuxB.keys():
+                    demuxB[pos] = list()
+                demuxB[pos].append(row['barcode'])
+            else:
+                # Any position is now fair game
+                for pos in range(0, args.abort):
                     if pos not in spacerP:
                         spacerP.append(pos)
                     if pos not in demuxB.keys():
                         demuxB[pos] = list()
                     demuxB[pos].append(row['barcode'])
-                else:
-                    # Any position is now fair game
-                    for pos in range(0, args.abort):
-                        if pos not in spacerP:
-                            spacerP.append(pos)
-                        if pos not in demuxB.keys():
-                            demuxB[pos] = list()
-                        demuxB[pos].append(row['barcode'])
 
 # Maybe the lane specifications did not match?
 if len(demuxS) == 0:
