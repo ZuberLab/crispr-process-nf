@@ -111,9 +111,9 @@ for barcode in demuxS.keys():
         pass
     file = lane + '_' + demuxS[barcode] + '.fq'
     fqOut[demuxS[barcode]] = open(os.path.join(laneout, file), "w")
-unmatched = None
+unknown = None
 if args.unmatched:
-    unmatched = open(os.path.join(args.outputdir, laneout + '_unmatched.fq'), "w")
+    unknown = open(os.path.join(args.outputdir, lane + '_unmatched.fq'), "w")
 
 
 # Process BAM file
@@ -129,6 +129,9 @@ for r in samin:
     #D00689:401:CDM9JANXX:3:1101:1593:1999	4	*	0	0	*	*	0	0	CGGCTNGTCAGTATTTTACCAATGACCAAATCAAAGAAATGACTCGCAAG	BBBBB#<BBFFFFFFFFFFFFFFF<FFFFFFFFFFFFFBFFFFFFFFFFF	B2:Z:NCNNNNCCT	Q2:Z:#<####BBB	BC:Z:GCATTNNNC	RG:Z:CDM9JANXX.3	QT:Z://///###/
     # 0                                     1   2   3   4   5   6   7   8   9                                                   10                                                  11              [12]            [13]            [14]                [15]
     counter.update(['total'])
+    if counter['total'] % 10000000 == 0:
+        sys.stderr.write(str(lane + ' : ' + str(counter['total']) + " reads processed\n"))
+        sys.stderr.flush()
     name = r.query_name
     seq = r.query_sequence
     quals = r.query_qualities
@@ -157,22 +160,23 @@ for r in samin:
     if anchorFoundAt is not None:   # The anchor could be matched at the given positions with the given mismatch allowance
         anchorEnd = anchorFoundAt + anchorLen
         bcPos = anchorEnd - 1 + args.bcOffset if args.bcOffset > 0 else anchorFoundAt + args.bcOffset
-        # Scan through the barcodes expected at this anchor position
-        bcfound = False
-        for bc in demuxB[anchorFoundAt]:
-            bcEnd = bcPos + len(bc)
-            if lev.hamming(bc, seq[bcPos:bcEnd]) <= args.bcmm:
-                bcFound = True
-                trimPos = max(bcEnd, anchorEnd) # Remember, bc can be either up- or down-stream of anchor
-                # Print FASTQ entry
-                fqOut[demuxS[bc]].write('@' + name + "\n" + seq[trimPos:] + "\n+\n" + qual[trimPos:] + "\n")
-                # Keep count
-                counter.update(['assigned', demuxS[bc]])
-        if not bcFound:
-            unmatched.write('@' + name + "\n" + seq + "\n+\n" + qual + "\n")
+        if bcPos >= 0:
+            # Scan through the barcodes expected at this anchor position
+            bcFound = False
+            for bc in demuxB[anchorFoundAt]:
+                bcEnd = bcPos + len(bc)
+                if bcEnd <= len(seq) and lev.hamming(bc, seq[bcPos:bcEnd]) <= args.bcmm:
+                    bcFound = True
+                    trimPos = max(bcEnd, anchorEnd) # Remember, bc can be either up- or down-stream of anchor
+                    # Print FASTQ entry
+                    fqOut[demuxS[bc]].write('@' + name + "\n" + seq[trimPos:] + "\n+\n" + qual[trimPos:] + "\n")
+                    # Keep count
+                    counter.update(['assigned', demuxS[bc]])
+        if (not bcFound) and args.unmatched:
+            unknown.write('@' + name + "\n" + seq + "\n+\n" + qual + "\n")
             counter.update(['BC unmatched'])
     elif args.unmatched:
-        unmatched.write('@' + name + "\n" + seq + "\n+\n" + qual + "\n")
+        unknown.write('@' + name + "\n" + seq + "\n+\n" + qual + "\n")
         counter.update(['Anchor unmatched'])
 samin.close()
 
@@ -181,7 +185,7 @@ samin.close()
 for file in fqOut.values():
     file.close()
 if args.unmatched:
-    unmatched.close()
+    unknown.close()
 
 
 # Print tally
