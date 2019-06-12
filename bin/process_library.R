@@ -24,7 +24,7 @@ library_name <- stringr::str_replace(basename(input_file), ".txt", "")
 `%>%` <- dplyr::`%>%`
 
 ### import
-raw <- readr::read_tsv(input_file)
+raw <- readr::read_tsv(input_file, col_types='ccc')
 
 ### check for id and sequence duplication
 stopifnot(!any(duplicated(raw$id)))
