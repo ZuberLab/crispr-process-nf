@@ -9,8 +9,7 @@
 # The spacer is used as anchor for finding the demultiplexing barcodes, then entire
 # region before the sgRNA gets clipped off.
 #
-# Input from an uncompressed SAM stdin stream.
-# Output to multiple FASTQ files, one per sample defined in the barcodes table.
+# Input from an unzipped FASTQ pipe.
 #
 # part of CRISPR / shRNA screen pre-processing pipeline
 #
@@ -19,17 +18,11 @@
 # 2019/05/23
 ################################################################################
 
-import sys, os, re, string, csv
+import sys, re, string, csv
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
 
-import pysam
-from Bio import SeqIO
-
-# Parameters
-############
 
 parser = ArgumentParser(description="Variable length trimming of leading n-mer.", formatter_class=RawDescriptionHelpFormatter)
-parser.add_argument("-i", "--bam", type=str, default=sys.stdin, help="Input BAM or SAM filename or stream (default stdin).")
 parser.add_argument("-o", "--outputdir", type=str, default="./process/fastq", help="Output directory where demultiplexed fastq files will be saved.")
 parser.add_argument("-l", "--logFile", type=str, default="./process/fastq/demultiplex_trim.log", help="Report file.")
 parser.add_argument("-d", "--demuxOffset", type=int, default=-4, help="Start position of demultiplexing barcode, relative to spacer. Negative integer for upstream of spacer start, positive integer for downstream of spacer end.")
@@ -40,9 +33,9 @@ args = parser.parse_args()
 # Get barcodes
 ##############
 
-# Dictionaries
-demuxS = dict() # demuxS[lane][barcode] = sample
-demuxP = dict() # demuxP[barcode] = position
+# Nested dict:  demuxS[lane][barcode] = sample
+demuxS = dict() # Sample names
+demuxP = dict() # Barcode excpected positions
 withPos=False   # Explicit barcode positions available
 
 # Parse barcodes
@@ -55,44 +48,23 @@ if args.barcodes:
                     withPos = True
             if withPos:
                     demuxP[ row['barcode'] ] = row['position']
-            lane = row['lane'][0:(len(row['lane'])-4)]         # crop .bam suffix
-            if not lane in demuxS.keys():
-                demuxS[lane] = dict()
-            demuxS[lane][ row['barcode'] ] = row['sample_name']
-
-# Anchor pattern
-################
-anchor = re.compile(args.anchorSeq)
-
-# Open output files
-###################
-fqOut = dict()
-for lane in demuxS.keys():
-    for barcode in demuxS[lane].keys():
-        laneout = os.path.join(args.outputdir, lane)
-        try:
-            os.makedirs(laneout)
-        except OSError:
-            pass
-        file = lane + '_' + demuxS[lane][barcode] + '.fastq'
-        fqOut[demuxS[lane][barcode]] = open(os.path(args.outputdir, laneout, file), "w")
+            m = re.search(r"^([A-Za-z0-9]+_\d+)", row['lane'])
+            if not m.group(1) in demuxS.keys():
+                demuxS[ m.group(1) ] = dict()
+            demuxS[ m.group(1) ][ row['barcode'] ] = row['sample_name']
 
 
 
-# Connect to BAM/SAM stream
-###########################
-#bam = pysam.AlignmentFile(args.bam)
-
-# Scan BAM/SAM stream
-#####################
-
-#SeqIO.write(sequences, output_handle, "fastq")
-
-# Close output files
-####################
-#bam.close()
 
 
 
-exit(0)
+
+
+
+
+
+
+
+
+
 #
