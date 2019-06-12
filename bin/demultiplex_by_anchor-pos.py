@@ -115,7 +115,7 @@ for barcode in demuxS.keys():
     fqOut[demuxS[barcode]] = open(os.path.join(laneout, file), "w")
 unknown = None
 if args.unmatched:
-    unknown = open(os.path.join(args.outputdir, lane + '_unmatched.fq'), "w")
+    unknown = open(os.path.join(args.outputdir, lane + '_unmatched.fq'), "w", buffering=10000000) # 10 MB
 
 fqcOut = dict()
 unknownqc = None
@@ -124,7 +124,7 @@ if args.trimQC:
         file = lane + '_' + demuxS[barcode] + '.fqc'
         fqcOut[demuxS[barcode]] = open(os.path.join(laneout, file), "w")
     if args.unmatched:
-        unknownqc = open(os.path.join(args.outputdir, lane + '_unmatched.fqc'), "w")
+        unknownqc = open(os.path.join(args.outputdir, lane + '_unmatched.fqc'), "w", buffering=10000000) # 10MB
 
 
 # Process BAM file
