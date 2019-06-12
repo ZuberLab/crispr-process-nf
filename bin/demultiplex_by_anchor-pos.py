@@ -49,6 +49,7 @@ parser.add_argument("-M", "--smm", type=int, default=2, help="Mismatches allowed
 parser.add_argument("-q", "--qualOffset", type=int, default=33, help="Base-call quality offset for conversion from pysam to fastq. (33)")
 parser.add_argument("-u", "--unmatched", action="store_true", help="Create a FASTQ file for all the reads that did not match the anchor or barcode within the given tolerances. Otherwise they will simply be ignored. (False)")
 parser.add_argument("-a", "--abort", type=int, default=30, help="Upper limit for how far into the read to search for the anchor, when no explicit positions are given in the barcodes file. (30)")
+parser.add_argument("-Q", "--trimQC", action="store_true", help="Also create FASTQ files that retain the barcode and spacer (but trim anything upstream of them). This allows FastQC to show sequence composition in that area.")
 args = parser.parse_args()
 
 # Clean up the lane name
@@ -97,7 +98,8 @@ with open(args.barcodes, "rt") as bcFile:
 
 # Maybe the lane specifications did not match?
 if len(demuxS) == 0:
-    raise Exception("Error: It looks like no info was parsed from the barcodes table. Does the value of --lane match a value in the 'lane' column of the barcodes table?")
+    sys.stderr.write(lane + "\n")
+    raise Exception("Error: It looks like no info was parsed from the barcodes table. Does the lane exist in the barcodes table?")
 
 
 # Open output files
@@ -114,6 +116,15 @@ for barcode in demuxS.keys():
 unknown = None
 if args.unmatched:
     unknown = open(os.path.join(args.outputdir, lane + '_unmatched.fq'), "w")
+
+fqcOut = dict()
+unknownqc = None
+if args.trimQC:
+    for barcode in demuxS.keys():
+        file = lane + '_' + demuxS[barcode] + '.fqc'
+        fqcOut[demuxS[barcode]] = open(os.path.join(laneout, file), "w")
+    if args.unmatched:
+        unknownqc = open(os.path.join(args.outputdir, lane + '_unmatched.fqc'), "w")
 
 
 # Process BAM file
@@ -170,13 +181,21 @@ for r in samin:
                     trimPos = max(bcEnd, anchorEnd) # Remember, bc can be either up- or down-stream of anchor
                     # Print FASTQ entry
                     fqOut[demuxS[bc]].write('@' + name + "\n" + seq[trimPos:] + "\n+\n" + qual[trimPos:] + "\n")
+                    # Print partly trimmed FASTQ entry for FastQC
+                    if args.trimQC:
+                        qctrimPos = min(bcPos, anchorFoundAt)
+                        fqcOut[demuxS[bc]].write('@' + name + "\n" + seq[qctrimPos:] + "\n+\n" + qual[qctrimPos:] + "\n")
                     # Keep count
                     counter.update(['assigned', demuxS[bc]])
         if (not bcFound) and args.unmatched:
             unknown.write('@' + name + "\n" + seq + "\n+\n" + qual + "\n")
+            if args.trimQC:
+                unknownqc.write('@' + name + "\n" + seq + "\n+\n" + qual + "\n")
             counter.update(['BC unmatched'])
     elif args.unmatched:
         unknown.write('@' + name + "\n" + seq + "\n+\n" + qual + "\n")
+        if args.trimQC:
+            unknownqc.write('@' + name + "\n" + seq + "\n+\n" + qual + "\n")
         counter.update(['Anchor unmatched'])
 samin.close()
 
@@ -184,8 +203,11 @@ samin.close()
 ####################
 for file in fqOut.values():
     file.close()
-if args.unmatched:
-    unknown.close()
+if args.trimQC:
+    for file in fqcOut.values():
+        file.close()
+    if args.unmatched:
+        unknownqc.close()
 
 
 # Print tally
