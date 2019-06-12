@@ -24,7 +24,7 @@ read_featurecounts <- function(path) {
 }
 
 ### combine counts
-library <- readr::read_tsv(library_file) %>%
+library <- readr::read_tsv(library_file, col_types='ccc') %>%
   dplyr::select(id, group)
 
 names(count_files) <- stringr::str_replace(basename(count_files), ".txt", "")
