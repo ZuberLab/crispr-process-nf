@@ -41,6 +41,7 @@ parser.add_argument("-o", "--bcOffset", type=int, default=-4, help="Start positi
 parser.add_argument("-s", "--anchorSeq", type=str, default='TTCCAGCATAGCTCTTAAAC', help="Spacer sequence to anchor. If using fixed positions specified in the barcodes table, \
                                                                                         this must be a literal sequence, not a regex. (TTCCAGCATAGCTCTTAAAC)")
 parser.add_argument("-r", "--anchorRegex", action="store_true", help="--anchorSeq is a regex. (False)")
+parser.add_argument("-g", "--guideLen", type=int, default=20, help="Hard clip the guides at that length. (20)")
 parser.add_argument("-b", "--barcodes", type=str, default='barcodes.txt', help="Demultiplexing table, tab-delimited (lane, sample_name, barcode, position). \
                                                                                 Position is 1-based and refers to the start of the anchoring !!SPACER!!, NOT the barcode start! \
                                                                                 If omitted, anchoring will fall back to regex search. (./barcodes.txt)")
@@ -104,15 +105,15 @@ if len(demuxS) == 0:
 
 # Open output files
 ###################
-fqOut = dict()
 laneout = os.path.join(args.outputdir, lane)
+fqOut = dict()
 for barcode in demuxS.keys():
     try:
         os.makedirs(laneout)
     except OSError:   # path already exists. Hopefully you have permission to write where you want to, so that won't be the cause.
         pass
     file = lane + '_' + demuxS[barcode] + '.fq'
-    fqOut[demuxS[barcode]] = open(os.path.join(laneout, file), "w")
+    fqOut[demuxS[barcode]] = open(os.path.join(laneout, file), "w", buffering=10000000) # 10MB
 unknown = None
 if args.unmatched:
     unknown = open(os.path.join(args.outputdir, lane + '_unmatched.fq'), "w", buffering=10000000) # 10 MB
@@ -122,7 +123,7 @@ unknownqc = None
 if args.trimQC:
     for barcode in demuxS.keys():
         file = lane + '_' + demuxS[barcode] + '.fqc'
-        fqcOut[demuxS[barcode]] = open(os.path.join(laneout, file), "w")
+        fqcOut[demuxS[barcode]] = open(os.path.join(laneout, file), "w", buffering=10000000) # 10MB
     if args.unmatched:
         unknownqc = open(os.path.join(args.outputdir, lane + '_unmatched.fqc'), "w", buffering=10000000) # 10MB
 
@@ -137,8 +138,6 @@ counter = Counter()
 # Parse SAM
 samin = pysam.AlignmentFile(args.bam, "rb", check_sq=False)
 for r in samin:
-    #D00689:401:CDM9JANXX:3:1101:1593:1999	4	*	0	0	*	*	0	0	CGGCTNGTCAGTATTTTACCAATGACCAAATCAAAGAAATGACTCGCAAG	BBBBB#<BBFFFFFFFFFFFFFFF<FFFFFFFFFFFFFBFFFFFFFFFFF	B2:Z:NCNNNNCCT	Q2:Z:#<####BBB	BC:Z:GCATTNNNC	RG:Z:CDM9JANXX.3	QT:Z://///###/
-    # 0                                     1   2   3   4   5   6   7   8   9                                                   10                                                  11              [12]            [13]            [14]                [15]
     counter.update(['total'])
     if counter['total'] % 10000000 == 0:
         sys.stderr.write(str(lane + ' : ' + str(counter['total']) + " reads processed\n"))
@@ -177,16 +176,18 @@ for r in samin:
             for bc in demuxB[anchorFoundAt]:
                 bcEnd = bcPos + len(bc)
                 if bcEnd <= len(seq) and lev.hamming(bc, seq[bcPos:bcEnd]) <= args.bcmm:
-                    bcFound = True
                     trimPos = max(bcEnd, anchorEnd) # Remember, bc can be either up- or down-stream of anchor
-                    # Print FASTQ entry
-                    fqOut[demuxS[bc]].write('@' + name + "\n" + seq[trimPos:] + "\n+\n" + qual[trimPos:] + "\n")
-                    # Print partly trimmed FASTQ entry for FastQC
-                    if args.trimQC:
-                        qctrimPos = min(bcPos, anchorFoundAt)
-                        fqcOut[demuxS[bc]].write('@' + name + "\n" + seq[qctrimPos:] + "\n+\n" + qual[qctrimPos:] + "\n")
-                    # Keep count
-                    counter.update(['assigned', demuxS[bc]])
+                    lentrim = trimPos + args.guideLen
+                    if lentrim <= len(seq):    # The guide is not cropped by read length
+                        bcFound = True
+                        # Print FASTQ entry
+                        fqOut[demuxS[bc]].write('@' + name + "\n" + seq[trimPos:lentrim] + "\n+\n" + qual[trimPos:lentrim] + "\n")
+                        # Print partly trimmed FASTQ entry for FastQC
+                        if args.trimQC:
+                            qctrimPos = min(bcPos, anchorFoundAt)
+                            fqcOut[demuxS[bc]].write('@' + name + "\n" + seq[qctrimPos:lentrim] + "\n+\n" + qual[qctrimPos:lentrim] + "\n")
+                        # Keep count
+                        counter.update(['assigned', demuxS[bc]])
         if (not bcFound) and args.unmatched:
             unknown.write('@' + name + "\n" + seq + "\n+\n" + qual + "\n")
             if args.trimQC:
@@ -203,6 +204,8 @@ samin.close()
 ####################
 for file in fqOut.values():
     file.close()
+if args.unmatched:
+    unknown.close()
 if args.trimQC:
     for file in fqcOut.values():
         file.close()
