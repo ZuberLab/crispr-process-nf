@@ -20,6 +20,8 @@ smm=2
 variable=0
 revcomp=0
 guideLen=20
+FU='/groups/zuber/zubarchive/USERS/Kimon/crispr-process-nf/bin'
+PYTHONPATH="$PYTHONPATH:$FU"
 # Parse options.
 while getopts 'i:l:b:n:r:z:p:s:u:d:O:g:M:A:eVr' flag; do
   case "${flag}" in
@@ -95,7 +97,7 @@ else
   # Demultiplex
   module load python-levenshtein/0.12.0-foss-2017a-python-2.7.13
   module load pysam/0.14.1-foss-2017a-python-2.7.13
-  /users/kimon.froussios/crispr-process-nf/bin/fileutilities.py T ${indir}/*.bam --loop srun ,--mem=50000 /users/kimon.froussios/crispr-process-nf/bin/demultiplex_by_anchor-pos.py ,-i {abs} ,-D ${countsdir}/fastq ,-l ${countsdir}/fastq/{bas}.log ,-o $bcoffset ,-s $spacer ,-g $guideLen ,-b $barcodes ,-m $bcmm ,-M $smm ,-q 33 ,-Q \&
+  ${FU}/fileutilities.py T ${indir}/*.bam --loop srun ,--mem=50000 /users/kimon.froussios/crispr-process-nf/bin/demultiplex_by_anchor-pos.py ,-i {abs} ,-D ${countsdir}/fastq ,-l ${countsdir}/fastq/{bas}.log ,-o $bcoffset ,-s $spacer ,-g $guideLen ,-b $barcodes ,-m $bcmm ,-M $smm ,-q 33 ,-Q \&
   module unload python-levenshtein/0.12.0-foss-2017a-python-2.7.13
   module unload pysam/0.14.1-foss-2017a-python-2.7.13
   wait_for_jobs demultip
@@ -103,12 +105,12 @@ else
   echo ''
   echo "FastQC (in the background)." # and don't wait for it. I don't need its output for a while.
   module load fastqc/0.11.5-java-1.8.0_121
-  /users/kimon.froussios/crispr-process-nf/bin/fileutilities.py T ${countsdir}/fastq/*/*.fqc --loop srun ,--mem=5000 ,--cpus-per-task 6 fastqc ,-q ,-t 6 ,-f fastq ,-o ${countsdir}/fastqc {abs} \&
+  ${FU}/fileutilities.py T ${countsdir}/fastq/*/*.fqc --loop srun ,--mem=5000 ,--cpus-per-task 6 fastqc ,-q ,-t 6 ,-f fastq ,-o ${countsdir}/fastqc {abs} \&
   module unload fastqc/0.11.5-java-1.8.0_121
   
   echo ''
   echo "Compressing FASTQ (in the background)."
-  /users/kimon.froussios/crispr-process-nf/bin/fileutilities.py T ${countsdir}/fastq/*/*.fq --loop srun ,--mem=50000 gzip {abs} \&
+  ${FU}/fileutilities.py T ${countsdir}/fastq/*/*.fq --loop srun ,--mem=50000 gzip {abs} \&
   
   echo ''
   echo "Guides library to FASTA."
@@ -128,14 +130,14 @@ else
   
   echo ''
   echo "Bowtie2 aligning."
-  /users/kimon.froussios/crispr-process-nf/bin/fileutilities.py T ${countsdir}/fastq/*/*.fq.gz --loop srun ,--mem=10000 ,--cpus-per-task=4 bowtie2 ,-x ${library/.txt/}  ,-U {abs} ,--threads 4 ,-L 20 ,--score-min 'C,0,-1' ,-N 0 ,--seed 42 '2>' ${countsdir}/aligned/${libname}/{bas}.log \> ${countsdir}/aligned/${libname}/{bas}.sam \&
+  ${FU}/fileutilities.py T ${countsdir}/fastq/*/*.fq.gz --loop srun ,--mem=10000 ,--cpus-per-task=4 bowtie2 ,-x ${library/.txt/}  ,-U {abs} ,--threads 4 ,-L 20 ,--score-min 'C,0,-1' ,-N 0 ,--seed 42 '2>' ${countsdir}/aligned/${libname}/{bas}.log \> ${countsdir}/aligned/${libname}/{bas}.sam \&
   module unload bowtie2/2.2.9-foss-2017a
   wait_for_jobs bowtie2
   
   echo ''
   echo "Quantifying with featureCounts."
   module load subread/1.5.0-p1-foss-2017a
-  /users/kimon.froussios/crispr-process-nf/bin/fileutilities.py T ${countsdir}/aligned/${libname}/*.sam --loop srun ,--mem=10000 ,--cpus-per-task=4 featureCounts ,-T 4 ,-a ${library/.txt/.saf} ,-F SAF ,-o ${countsdir}/counts/${libname}/{bas}.txt {abs} \&
+  ${FU}/fileutilities.py T ${countsdir}/aligned/${libname}/*.sam --loop srun ,--mem=10000 ,--cpus-per-task=4 featureCounts ,-T 4 ,-a ${library/.txt/.saf} ,-F SAF ,-o ${countsdir}/counts/${libname}/{bas}.txt {abs} \&
   module unload subread/1.5.0-p1-foss-2017a
   wait_for_jobs featureC
   
