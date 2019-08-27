@@ -23,7 +23,7 @@ guideLen=20
 FU='/groups/zuber/zubarchive/USERS/Kimon/crispr-process-nf/bin'
 PYTHONPATH="$PYTHONPATH:$FU"
 # Parse options.
-while getopts 'i:l:b:n:r:z:p:s:u:d:O:g:M:A:eVr' flag; do
+while getopts 'i:l:b:n:r:z:p:s:u:d:O:g:M:A:Vr' flag; do
   case "${flag}" in
     i) indir="${OPTARG}" ;;           # Input directory with unaligned BAMs
     l) library="${OPTARG}" ;;         # sgRNA library
@@ -116,7 +116,7 @@ else
   echo "Guides library to FASTA."
   cw=$(realpath $(pwd))
   cd $(dirname $library)
-  srun ~/crispr-process-nf/bin/process_library.R $library C
+  srun ${FU}/process_library.R $library C
   cd $cw
   
   echo ''
@@ -143,7 +143,7 @@ else
   
   echo ''
   echo "Combining samples into one table."
-  srun --mem=5000 ~/crispr-process-nf/bin/combine_counts.R $library ${countsdir}/counts/${libname}/*.fq.txt > ${countsdir}/counts/${libname}/counts_mageck.txt
+  srun --mem=5000 ${FU}/combine_counts.R $library ${countsdir}/counts/${libname}/*.fq.txt > ${countsdir}/counts/${libname}/counts_mageck.txt
   # Fix header. Strip path, strip file extension, strip lane
   mv ${countsdir}/counts/${libname}/counts_mageck.txt ${countsdir}/counts/${libname}/_counts_mageck.txt
   head -n 1 ${countsdir}/counts/${libname}/_counts_mageck.txt | perl -e 'while(<STDIN>){~s/\S+\/(\w{9}_\d_)+//g;~s/\.fq//g;print}' > ${countsdir}/counts/${libname}/counts_mageck.txt
