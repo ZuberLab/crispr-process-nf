@@ -1,4 +1,4 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/env python3
 
 ################################################################################
 # Demultiplex based on and then clip variable-length barcode region.
@@ -7,7 +7,7 @@
 # a random N-mer at the beginning, a demultiplexing barcode, and a fixed-sequence spacer.
 # The sgRNA sequence follows immediately after this region.
 #
-# The spacer is used as anchor to identify the variable position of the demultiplexing barcodes, 
+# The spacer is used as anchor to identify the variable position of the demultiplexing barcodes,
 # then the entire region before the sgRNA gets clipped off.
 #
 # Input from a BAM file.
@@ -42,7 +42,7 @@ parser.add_argument("-s", "--anchorSeq", type=str, default='TTCCAGCATAGCTCTTAAAC
                                                                                         this must be a literal sequence, not a regex. (TTCCAGCATAGCTCTTAAAC)")
 parser.add_argument("-r", "--anchorRegex", action="store_true", help="--anchorSeq is a regex. (False)")
 parser.add_argument("-g", "--guideLen", type=int, default=20, help="Hard clip the guides at that length. (20)")
-parser.add_argument("-b", "--barcodes", type=str, default='barcodes.txt', help="Demultiplexing table, tab-delimited (lane, sample_name, barcode, position). \
+parser.add_argument("-b", "--barcodes", type=str, default='barcodes.txt', help="Demultiplexing table, tab-delimited (lane, sample_name, barcode, anchor_pos). \
                                                                                 Position is 1-based and refers to the start of the anchoring !!SPACER!!, NOT the barcode start! \
                                                                                 If omitted, anchoring will fall back to regex search. (./barcodes.txt)")
 parser.add_argument("-m", "--bcmm", type=int, default=1, help="Mismatches allowed in matching the demultiplexing barcodes. (1)")
@@ -57,7 +57,7 @@ args = parser.parse_args()
 lane = os.path.basename(args.bam)
 if lane[(len(lane)-4):len(lane)] == '.bam':
     lane = lane[0:(len(lane)-4)]         # crop .bam suffix
-    
+
 
 # Get barcodes
 ##############
@@ -75,12 +75,14 @@ with open(args.barcodes, "rt") as bcFile:
         if i == 0:
             if not ("lane" in row.keys() or "sample_name" in row.keys() or "barcode" in row.keys()):
                 raise Exception("Error: 'lane', 'sample_name', or 'barcode' field is missing from the barcodes table.")
-            if 'position' in row.keys():
+            if 'anchor_pos' in row.keys():
                 withPos = True              # Spacer start positions have been defined.
+            if 'position' in row.keys():
+                exit("The 'position' field is deprecated. It should now be named 'anchor_pos'.")
         if row['lane'] == lane or row['lane'] == lane + '.bam':    # Only interested in the details for the lane being demultiplexed by this instance of the script.
             demuxS[ row['barcode'] ] = row['sample_name']
             if withPos:
-                pos = int(row['position']) - 1  # 0-based indexing
+                pos = int(row['anchor_pos']) - 1  # 0-based indexing
                 if pos < 0:
                     raise ValueError(' '.join("Invalid barcode position definition for", row['lane'], row['barcode'], row['sample_name']))
                 if pos not in spacerP:
