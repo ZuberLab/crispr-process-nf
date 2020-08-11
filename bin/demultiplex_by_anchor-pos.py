@@ -73,8 +73,8 @@ with open(args.barcodes, "rt") as bcFile:
     csvreader = csv.DictReader(bcFile, delimiter="\t")
     for i, row in enumerate(csvreader):
         if i == 0:
-            if not ("lane" in row.keys() or "sample_name" in row.keys() or "barcode" in row.keys()):
-                raise Exception("Error: 'lane', 'sample_name', or 'barcode' field is missing from the barcodes table.")
+            if not ("lane" in row.keys() or "sample_name" in row.keys() or "barcode" in row.keys() or "anchor_pos" in row.keys()):
+                raise Exception("Error: 'lane', 'sample_name', 'barcode', or 'anchor_pos' field is missing from the barcodes table.")
             if 'anchor_pos' in row.keys():
                 withPos = True              # Spacer start positions have been defined.
             if 'position' in row.keys():
@@ -114,7 +114,7 @@ for barcode in demuxS.keys():
         os.makedirs(laneout)
     except OSError:   # path already exists. Hopefully you have permission to write where you want to, so that won't be the cause.
         pass
-    file = lane + '_' + demuxS[barcode] + '.fq'
+    file = lane + '_' + demuxS[barcode] + '.fastq'
     fqOut[demuxS[barcode]] = open(os.path.join(laneout, file), "w", buffering=10000000) # 10MB
 unknown = None
 if args.unmatched:
@@ -172,12 +172,12 @@ for r in samin:
     if anchorFoundAt is not None:   # The anchor could be matched at the given positions with the given mismatch allowance
         anchorEnd = anchorFoundAt + anchorLen
         bcPos = anchorEnd - 1 + args.bcOffset if args.bcOffset > 0 else anchorFoundAt + args.bcOffset
-        if bcPos >= 0:
+        if bcPos >= 0:    # If read not malformed (shifted/truncated to the left)
             # Scan through the barcodes expected at this anchor position
             bcFound = False
             for bc in demuxB[anchorFoundAt]:
                 bcEnd = bcPos + len(bc)
-                if bcEnd <= len(seq) and lev.hamming(bc, seq[bcPos:bcEnd]) <= args.bcmm:
+                if bcEnd <= len(seq) and lev.hamming(bc, seq[bcPos:bcEnd]) <= args.bcmm:    # If not right-truncated and within mismatch allowance
                     trimPos = max(bcEnd, anchorEnd) # Remember, bc can be either up- or down-stream of anchor
                     lentrim = trimPos + args.guideLen
                     if lentrim <= len(seq):    # The guide is not cropped by read length
@@ -190,16 +190,18 @@ for r in samin:
                             fqcOut[demuxS[bc]].write('@' + name + "\n" + seq[qctrimPos:lentrim] + "\n+\n" + qual[qctrimPos:lentrim] + "\n")
                         # Keep count
                         counter.update(['assigned', demuxS[bc]])
-        if (not bcFound) and args.unmatched:
-            unknown.write('@' + name + "\n" + seq + "\n+\n" + qual + "\n")
-            if args.trimQC:
-                unknownqc.write('@' + name + "\n" + seq + "\n+\n" + qual + "\n")
-            counter.update(['BC unmatched'])
+                        break
+            if (not bcFound) and args.unmatched:
+                unknown.write('@' + name + "\n" + seq + "\n+\n" + qual + "\n")
+                if args.trimQC:
+                    unknownqc.write('@' + name + "\n" + seq + "\n+\n" + qual + "\n")
+                counter.update(['BC unmatched'])
     elif args.unmatched:
         unknown.write('@' + name + "\n" + seq + "\n+\n" + qual + "\n")
         if args.trimQC:
             unknownqc.write('@' + name + "\n" + seq + "\n+\n" + qual + "\n")
         counter.update(['Anchor unmatched'])
+    break
 samin.close()
 
 # Close output files
