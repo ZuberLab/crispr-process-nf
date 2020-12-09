@@ -33,6 +33,7 @@ import pysam
 ############
 
 parser = ArgumentParser(description="Demultiplexing with variable length 5' construct of barcode and spacers.", formatter_class=RawDescriptionHelpFormatter)
+parser.add_argument("--reverse_complement", action="store_true", help="Reverse complement the barcodes (False).")
 parser.add_argument("-i", "--bam", type=str, required=True, help="Input BAM file. Single-end reads.")
 parser.add_argument("-D", "--outputdir", type=str, default="./process/fastq", help="Output directory where demultiplexed fastq files will be saved.")
 parser.add_argument("-l", "--tally", type=str, required=False, help="File to write a tally of the reads assigned to each sample. (Default STDOUT)")
@@ -49,7 +50,7 @@ parser.add_argument("-m", "--bcmm", type=int, default=1, help="Mismatches allowe
 parser.add_argument("-M", "--smm", type=int, default=2, help="Mismatches allowed in matching the spacer sequence. (2)")
 parser.add_argument("-q", "--qualOffset", type=int, default=33, help="Base-call quality offset for conversion from pysam to fastq. (33)")
 parser.add_argument("-u", "--unmatched", action="store_true", help="Create a FASTQ file for all the reads that did not match the anchor or barcode within the given tolerances. Otherwise they will simply be ignored. (False)")
-parser.add_argument("-a", "--abort", type=int, default=30, help="Upper limit for how far into the read to search for the anchor, when no explicit positions are given in the barcodes file. (30)")
+parser.add_argument("-a", "--abort", type=int, default=30, help="Upper limit for how far form the start into the read to search for the anchor, when no explicit positions are given in the barcodes file. (30)")
 parser.add_argument("-Q", "--trimQC", action="store_true", help="Also create FASTQ files that retain the barcode and spacer (but trim anything upstream of them). This allows FastQC to show sequence composition in that area.")
 args = parser.parse_args()
 
@@ -61,6 +62,9 @@ if lane[(len(lane)-4):len(lane)] == '.bam':
 
 # Get barcodes
 ##############
+
+# Reverse complement helper
+RC = {'A':'T','C':'G','G':'C','T':'A', 'N':'N'}
 
 # Dictionaries
 demuxS = dict()  # demuxS[barcode] = sample
@@ -80,16 +84,19 @@ with open(args.barcodes, "rt") as bcFile:
             if 'position' in row.keys():
                 exit("The 'position' field is deprecated. It should now be named 'anchor_pos'.")
         if row['lane'] == lane or row['lane'] == lane + '.bam':    # Only interested in the details for the lane being demultiplexed by this instance of the script.
-            demuxS[ row['barcode'] ] = row['sample_name']
+            bc = row['barcode']
+            if args.reverse_complement:
+                bc = ''.join([RC[b] for b in bc[::-1].upper()])
+            demuxS[ bc ] = row['sample_name']
             if withPos:
                 pos = int(row['anchor_pos']) - 1  # 0-based indexing
                 if pos < 0:
-                    raise ValueError(' '.join("Invalid barcode position definition for", row['lane'], row['barcode'], row['sample_name']))
+                    raise ValueError(' '.join("Invalid barcode position definition for", row['lane'], bc, row['sample_name']))
                 if pos not in spacerP:
                     spacerP.append(pos)
                 if pos not in demuxB.keys():
                     demuxB[pos] = list()
-                demuxB[pos].append(row['barcode'])
+                demuxB[pos].append(bc)
             else:
                 # Any position is now fair game
                 for pos in range(0, args.abort):
@@ -97,7 +104,8 @@ with open(args.barcodes, "rt") as bcFile:
                         spacerP.append(pos)
                     if pos not in demuxB.keys():
                         demuxB[pos] = list()
-                    demuxB[pos].append(row['barcode'])
+                    demuxB[pos].append(bc)
+sys.stdout.write('Parsed ' + str(len(demuxS)) + " lanes\n")
 
 # Maybe the lane specifications did not match?
 if len(demuxS) == 0:
@@ -132,6 +140,7 @@ if args.trimQC:
 
 # Process BAM file
 ##################
+sys.stdout.write('Parsing BAM ' + args.bam + "\n")
 # Spacer pattern
 anchor = re.compile(args.anchorSeq) # Pattern matching
 anchorLen = len(args.anchorSeq)     # Will be overwritten later if anchorSeq is a regex
@@ -139,7 +148,9 @@ anchorLen = len(args.anchorSeq)     # Will be overwritten later if anchorSeq is 
 counter = Counter()
 # Parse SAM
 samin = pysam.AlignmentFile(args.bam, "rb", check_sq=False)
+i = 1
 for r in samin:
+    i = i+1
     counter.update(['total'])
     if counter['total'] % 10000000 == 0:
         sys.stderr.write(str(lane + ' : ' + str(counter['total']) + " reads processed\n"))
@@ -196,12 +207,12 @@ for r in samin:
                 if args.trimQC:
                     unknownqc.write('@' + name + "\n" + seq + "\n+\n" + qual + "\n")
                 counter.update(['BC unmatched'])
-    elif args.unmatched:
-        unknown.write('@' + name + "\n" + seq + "\n+\n" + qual + "\n")
-        if args.trimQC:
-            unknownqc.write('@' + name + "\n" + seq + "\n+\n" + qual + "\n")
+    else:
         counter.update(['Anchor unmatched'])
-    break
+        if args.unmatched:
+            unknown.write('@' + name + "\n" + seq + "\n+\n" + qual + "\n")
+            if args.trimQC:
+                unknownqc.write('@' + name + "\n" + seq + "\n+\n" + qual + "\n")
 samin.close()
 
 # Close output files
