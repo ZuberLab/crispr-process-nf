@@ -1,0 +1,17 @@
+name: crispr-process
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - samtools
+  - bowtie2
+  - cutadapt
+  - r-base=4.0.3
+  - r-tidyverse
+  - bioconductor-biostrings
+  - pigz
+  - fastx_toolkit
+  - subread
+  - multiqc
+  - fastqc

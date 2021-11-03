@@ -24,7 +24,7 @@ read_featurecounts <- function(path) {
 }
 
 ### combine counts
-library <- readr::read_tsv(library_file, col_types='ccc') %>%
+library <- readr::read_tsv(library_file) %>%
   dplyr::select(id, group)
 
 names(count_files) <- stringr::str_replace(basename(count_files), ".txt", "")
@@ -34,6 +34,8 @@ lapply(count_files, read_featurecounts) %>%
   purrr::map(tidyr::gather, sample_name, count, -id) %>%
   dplyr::bind_rows() %>%
   dplyr::mutate(sample_name = stringr::str_replace_all(sample_name, pattern, "")) %>%
+  #remove stagger length information from sample name
+  dplyr::mutate(sample_name = stringr::str_sub(sample_name, start = 1, end = -15)) %>%
   dplyr::group_by(id, sample_name) %>%
   dplyr::summarize(count = sum(count)) %>%
   dplyr::ungroup() %>%
