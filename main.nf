@@ -27,7 +27,7 @@ def helpMessage() {
                                         - sequence: nucleotide sequence of sgRNA / shRNA
 
          --barcodes                 Path to file containing barcodes for demultiplexing.
-                                    (default: 'barcodes.fasta')
+                                    (default: 'barcodes.txt')
                                     The following columns are required:
                                         - lane:         name of BAM / FASTQ input file
                                         - sample_name:  name of demultiplexed sample followed by an integer number (1-4)
@@ -122,7 +122,8 @@ process bam_to_fastq {
 
     script:
     """
-    samtools fastq -@ ${task.cpus} ${bam} > ${lane}.fastq
+    samtools fastq -@ ${task.cpus} ${bam} -2 read_pairs_not_used.fastq > ${lane}.fastq
+    rm read_pairs_not_used.fastq
     pigz -p ${task.cpus} ${lane}.fastq
     """
 }
