@@ -43,7 +43,7 @@ def helpMessage() {
                                     (default for sgRNA: 2)
 
         --barcode_demux_mismatches  Number of mismatches allowed during demultiplexing
-                                    of barcode. (default: 2)
+                                    of barcode. (default: 1)
 
         --barcode_length            Number of nucleotides in sample barcode.
                                     (default: 4)
