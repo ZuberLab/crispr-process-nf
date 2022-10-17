@@ -17,14 +17,15 @@
 ### command line parameters
 args         <- commandArgs(trailingOnly = TRUE)
 input_file   <- args[1]
-padding_base <- toupper(args[2])
+padding_beginning <- toupper(args[2])
+padding_end <- toupper(args[3])
 library_name <- stringr::str_replace(basename(input_file), ".txt", "")
 
 ### functions
 `%>%` <- dplyr::`%>%`
 
 ### import
-raw <- readr::read_tsv(input_file)
+raw <- readr::read_tsv(input_file, col_types='ccc')
 
 ### check for id and sequence duplication
 stopifnot(!any(duplicated(raw$id)))
@@ -33,9 +34,15 @@ stopifnot(!any(duplicated(raw$sequence)))
 ### generate fasta file for bowtie2 index
 seq_length <- max(nchar(raw$sequence))
 
-raw$sequence %>%
+# raw$sequence %>%
+#   toupper %>%
+#   stringr::str_pad(pad = padding_base, width = seq_length, side = "left") %>%
+#   purrr::set_names(raw$id) %>%
+#   Biostrings::DNAStringSet() %>%
+#   Biostrings::writeXStringSet(paste0(library_name, ".fasta"), format = "fasta")
+
+paste0(padding_beginning, raw$sequence, padding_end) %>%
   toupper %>%
-  stringr::str_pad(pad = padding_base, width = seq_length, side = "left") %>%
   purrr::set_names(raw$id) %>%
   Biostrings::DNAStringSet() %>%
   Biostrings::writeXStringSet(paste0(library_name, ".fasta"), format = "fasta")

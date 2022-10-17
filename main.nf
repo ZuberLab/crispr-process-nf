@@ -27,7 +27,7 @@ def helpMessage() {
                                         - sequence: nucleotide sequence of sgRNA / shRNA
 
          --barcodes                 Path to file containing barcodes for demultiplexing.
-                                    (default: 'barcodes.txt')
+                                    (default: 'barcodes.fasta')
                                     The following columns are required:
                                         - lane:         name of BAM / FASTQ input file
                                         - sample_name:  name of demultiplexed sample followed by an integer number (1-4)
@@ -43,7 +43,7 @@ def helpMessage() {
                                     (default for sgRNA: 2)
 
         --barcode_demux_mismatches  Number of mismatches allowed during demultiplexing
-                                    of barcode. (default: 1)
+                                    of barcode. (default: 2)
 
         --barcode_length            Number of nucleotides in sample barcode.
                                     (default: 4)
@@ -51,9 +51,13 @@ def helpMessage() {
         --spacer_length             Number of nucleotides in spacer sequence between
                                     barcodes and sgRNA / shRNA sequence. (default: 20)
 
-        --padding_base              Nucleotide used for padding if sgRNA / shRNA are of
+        --padding_beginning         Nucleotides used for 5' padding if sgRNA / shRNA are of
                                     unequal length. Must be one of G, C, T, and A.
-                                    (default: C)
+                                    (default: ACC)
+
+        --padding_end               Nucleotides used for 3' padding if sgRNA / shRNA are of
+                                    unequal length. Must be one of G, C, T, and A.
+                                    (default: GGT)
 
      Profiles:
         standard                    local execution
@@ -87,7 +91,8 @@ log.info " barcode random (nt)      : ${params.barcode_random_length}"
 log.info " barcode demultiplex (nt) : ${params.barcode_length}"
 log.info " spacer (nt)              : ${params.spacer_length}"
 log.info " demultiplex mismatches   : ${params.barcode_demux_mismatches}"
-log.info " 5' guide padding base    : ${params.padding_base}"
+log.info " 5' guide padding base    : ${params.padding_beginning}"
+log.info " 3' guide padding base    : ${params.padding_end}"
 log.info " reverse complement       : ${params.reverse_complement}"
 log.info " ======================"
 log.info ""
@@ -257,7 +262,7 @@ process trim_barcode_and_spacer {
     remove_beginning=\$(expr \${stagger_length} + ${barcode_spacer_length})
 
     cutadapt ${fastq} -j ${task.cpus} -u \${remove_beginning} -o ${id}_remove_beginning.fastq.gz
-    cutadapt ${id}_remove_beginning.fastq.gz -j ${task.cpus} -l 20 -o ${id}.fastq.gz
+    cutadapt ${id}_remove_beginning.fastq.gz -j ${task.cpus} -l 21 -o ${id}.fastq.gz
 
     rm ${id}_remove_beginning.fastq.gz
 
@@ -278,7 +283,7 @@ process process_library {
 
     script:
     """
-    process_library.R ${library} ${params.padding_base}
+    process_library.R ${library} ${params.padding_beginning} ${params.padding_end}
     """
 }
 
@@ -316,11 +321,11 @@ process align {
     bowtie2 \
         --threads \$((${task.cpus})) \
         -x ${index}/index \
-        -L 22 \
+        -L 21 \
         --score-min 'C,0,-1' \
         -N 0 \
+        --seed 42 \
         <(zcat ${fastq}) 2> ${id}.log > ${id}.sam
-
     """
 }
 
