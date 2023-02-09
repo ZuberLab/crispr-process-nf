@@ -51,6 +51,8 @@ def helpMessage() {
         --spacer_length             Number of nucleotides in spacer sequence between
                                     barcodes and sgRNA / shRNA sequence. (default: 20)
 
+        --guide_length              Number of nucleotides in guide sequence. (default: 21)
+
         --padding_beginning         Nucleotides used for 5' padding if sgRNA / shRNA are of
                                     unequal length. Must be one of G, C, T, and A.
                                     (default: ACC)
@@ -262,7 +264,7 @@ process trim_barcode_and_spacer {
     remove_beginning=\$(expr \${stagger_length} + ${barcode_spacer_length})
 
     cutadapt ${fastq} -j ${task.cpus} -u \${remove_beginning} -o ${id}_remove_beginning.fastq.gz
-    cutadapt ${id}_remove_beginning.fastq.gz -j ${task.cpus} -l 21 -o ${id}.fastq.gz
+    cutadapt ${id}_remove_beginning.fastq.gz -j ${task.cpus} -l ${params.guide_length} -o ${id}.fastq.gz
 
     rm ${id}_remove_beginning.fastq.gz
 
