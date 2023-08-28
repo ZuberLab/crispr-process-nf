@@ -323,7 +323,7 @@ process align {
     bowtie2 \
         --threads \$((${task.cpus})) \
         -x ${index}/index \
-        -L 21 \
+        -L ${params.guide_length} \
         --score-min 'C,0,-1' \
         -N 0 \
         --seed 42 \
