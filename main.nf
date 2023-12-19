@@ -260,7 +260,7 @@ process trim_barcode_and_spacer {
     barcode_spacer_length = params.spacer_length + params.barcode_length
     """
     str=${id}
-    stagger_length="\${str: -1}"
+    stagger_length="$(cut -d'STAGGERLENGTH' -f2 <<<'$str')"
     remove_beginning=\$(expr \${stagger_length} + ${barcode_spacer_length})
 
     cutadapt ${fastq} -j ${task.cpus} -u \${remove_beginning} -o ${id}_remove_beginning.fastq.gz
