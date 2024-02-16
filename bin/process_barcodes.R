@@ -38,7 +38,7 @@ for(i in 1:length(lanes)){
   for(x in 1:nrow(file_buff)){
     id<-paste0(">", file_buff$X1[x])
     barcode<-paste0("^", file_buff$X2[x])
-    readr::write_lines(file = paste0(lanes[i], ".fasta"), x=id, append = T)
-    readr::write_lines(file = paste0(lanes[i], ".fasta"), x=barcode, append = T)
+    readr::write_lines(paste0(lanes[i], ".fasta"), x=id, append = T)
+    readr::write_lines(paste0(lanes[i], ".fasta"), x=barcode, append = T)
   }
 }

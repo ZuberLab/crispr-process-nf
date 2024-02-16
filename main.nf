@@ -17,17 +17,17 @@ def helpMessage() {
                                     (default: '01_raw')
 
         --outputDir                 Output directory for processed files.
-                                    (default: '02_processed')
+                                    (default: 'results')
 
         --library                   Path to sgRNA / shRNA library file.
                                     (default: 'library.txt')
                                     The following columns are required:
                                         - id:       unique name of sgRNA / shRNA
-                                        - gene:     gene targeted by sgRNA / shRNA
+                                        - group:     gene targeted by sgRNA / shRNA
                                         - sequence: nucleotide sequence of sgRNA / shRNA
 
          --barcodes                 Path to file containing barcodes for demultiplexing.
-                                    (default: 'barcodes.fasta')
+                                    (default: 'barcodes.txt')
                                     The following columns are required:
                                         - lane:         name of BAM / FASTQ input file
                                         - sample_name:  name of demultiplexed sample followed by an integer number (1-4)
@@ -260,7 +260,7 @@ process trim_barcode_and_spacer {
     barcode_spacer_length = params.spacer_length + params.barcode_length
     """
     str=${id}
-    stagger_length="$(cut -d'STAGGERLENGTH' -f2 <<<'$str')"
+    stagger_length="\$( awk -F 'STAGGERLENGTH' '{print \$2}' <<< \${str})"
     remove_beginning=\$(expr \${stagger_length} + ${barcode_spacer_length})
 
     cutadapt ${fastq} -j ${task.cpus} -u \${remove_beginning} -o ${id}_remove_beginning.fastq.gz
