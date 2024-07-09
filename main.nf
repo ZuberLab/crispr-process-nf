@@ -403,6 +403,7 @@ process fastqc {
     script:
     """
     fastqc -t ${task.cpus} -q ${fastq}
+    for i in *_fastqc*; do mv "$i" ${lane}_"$i"; done
     """
 }
 
