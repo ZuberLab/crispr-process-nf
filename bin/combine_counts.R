@@ -18,7 +18,7 @@ count_files  <- args[2:length(args)]
 `%>%` <- dplyr::`%>%`
 
 read_featurecounts <- function(path) {
-  readr::read_tsv(path, comment = "#") %>%
+  readr::read_tsv(path, skip = 1) %>%
     dplyr::select(-Chr, -Start, -End, -Strand, -Length) %>%
     dplyr::rename(id = Geneid)
 }
@@ -35,7 +35,8 @@ lapply(count_files, read_featurecounts) %>%
   dplyr::bind_rows() %>%
   dplyr::mutate(sample_name = stringr::str_replace_all(sample_name, pattern, "")) %>%
   #remove stagger length information from sample name
-  dplyr::mutate(sample_name = stringr::str_split(sample_name, "STAGGERLENGTH") %>% lapply("[[", 1) %>% unlist) %>%
+  dplyr::mutate(sample_name = stringr::str_split(sample_name, "#") %>% lapply("[[", 2) %>% unlist %>%
+                  stringr::str_split("STAGGERLENGTH") %>% lapply("[[", 1) %>% unlist) %>%
   dplyr::group_by(id, sample_name) %>%
   dplyr::summarize(count = sum(count)) %>%
   dplyr::ungroup() %>%

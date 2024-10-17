@@ -225,7 +225,7 @@ process demultiplex {
 
     script:
     """
-    cutadapt -j ${task.cpus} -e ${params.barcode_demux_mismatches} --no-indels -g file:${files[0]} --action=none -o "{name}.fq.gz" ${files[1]}
+    cutadapt -j ${task.cpus} -e ${params.barcode_demux_mismatches} --no-indels -g file:${files[0]} --action=none -o "${lane}#{name}.fq.gz" ${files[1]}
     """
 }
 
@@ -403,7 +403,6 @@ process fastqc {
     script:
     """
     fastqc -t ${task.cpus} -q ${fastq}
-    for i in *_fastqc*; do mv "$i" ${lane}_"$i"; done
     """
 }
 
