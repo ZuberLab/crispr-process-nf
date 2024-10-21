@@ -4,9 +4,9 @@
 # process sample annotation to obtain input demultiplexing
 # part of CRISPR / shRNA screen pre-processing pipeline
 # 
-# Jesse J. Lipp
+# Jesse J. Lipp & Florian Andersch
 # Institute of Molecular Pathology (IMP), Vienna, Austria
-# 2017/09/20
+# 2024/10/21
 ################################################################################
 
 # barcode file should be tab-separated text file with three columns:

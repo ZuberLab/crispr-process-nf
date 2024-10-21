@@ -4,9 +4,9 @@
 # process library text file
 # part of CRISPR / shRNA screen pre-processing pipeline
 # 
-# Jesse J. Lipp
+# Florian Andersch & Jesse J. Lipp
 # Institute of Molecular Pathology (IMP), Vienna, Austria
-# 2017/08/30
+# 2024/10/21
 ################################################################################
 
 # library file should be tab-separated text file with three columns:
@@ -18,7 +18,6 @@
 args         <- commandArgs(trailingOnly = TRUE)
 input_file   <- args[1]
 padding_beginning <- toupper(args[2])
-padding_end <- toupper(args[3])
 library_name <- stringr::str_replace(basename(input_file), ".txt", "")
 
 ### functions
@@ -34,15 +33,9 @@ stopifnot(!any(duplicated(raw$sequence)))
 ### generate fasta file for bowtie2 index
 seq_length <- max(nchar(raw$sequence))
 
-# raw$sequence %>%
-#   toupper %>%
-#   stringr::str_pad(pad = padding_base, width = seq_length, side = "left") %>%
-#   purrr::set_names(raw$id) %>%
-#   Biostrings::DNAStringSet() %>%
-#   Biostrings::writeXStringSet(paste0(library_name, ".fasta"), format = "fasta")
-
-paste0(padding_beginning, raw$sequence, padding_end) %>%
+paste0(padding_beginning, raw$sequence) %>%
   toupper %>%
+  stringr::str_sub(start=-23) %>%
   purrr::set_names(raw$id) %>%
   Biostrings::DNAStringSet() %>%
   Biostrings::writeXStringSet(paste0(library_name, ".fasta"), format = "fasta")

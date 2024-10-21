@@ -30,26 +30,19 @@ def helpMessage() {
                                     (default: 'barcodes.txt')
                                     The following columns are required:
                                         - lane:         name of BAM / FASTQ input file
-                                        - sample_name:  name of demultiplexed sample followed by an integer number (1-4)
-                                                        corresponding to the length of the stagger sequence used for this sample,
-                                                        seperated by the keyword STAGGERLENGTH (e.g. STAGGERLENGTH1, STAGGERLENGTH2, ...)
-                                        - barcode:      8 nucleotide long sequence of the stagger, followed by the sample barcode,
-                                                        filled up to a length of 8 nucleotides with the subsequent sequence of the spacer
+                                        - sample_name:  name of demultiplexed sample 
+                                        - barcode:      sequence of the sample barcode, 
+                                                        must be unique for each sample
 
-        --reverse_complement        Should reads be converted to reverse_complement
-                                    before trimming (default: false)
-
-        --barcode_random_length     Number of nucleotides in random barcode
-                                    (default for sgRNA: 2)
 
         --barcode_demux_mismatches  Number of mismatches allowed during demultiplexing
-                                    of barcode. (default: 2)
+                                    of barcode. (default: 0)
 
         --barcode_length            Number of nucleotides in sample barcode.
                                     (default: 4)
 
-        --spacer_length             Number of nucleotides in spacer sequence between
-                                    barcodes and sgRNA / shRNA sequence. (default: 20)
+        --spacer_seq                Nucleotide sequence in spacer sequence between
+                                    barcodes and sgRNA / shRNA sequence. (default: TTCCAGCATAGCTCTTAAAC)
 
         --guide_length              Number of nucleotides in guide sequence. (default: 21)
 
@@ -57,21 +50,17 @@ def helpMessage() {
                                     unequal length. Must be one of G, C, T, and A.
                                     (default: ACC)
 
-        --padding_end               Nucleotides used for 3' padding if sgRNA / shRNA are of
-                                    unequal length. Must be one of G, C, T, and A.
-                                    (default: GGT)
-
      Profiles:
         standard                    local execution
-        singularity                 local execution with singularity
-        ii2                         SLURM execution with singularity on IMPIMBA2
+        apptainer                   local execution with apptainer
+        cbe                         SLURM execution with apptainer on CBE cluster
 
      Docker:
      zuberlab/crispr-nf:latest
 
      Author:
-     Jesse J. Lipp (jesse.lipp@imp.ac.at)
      Florian Andersch (florian.andersch@imp.ac.at)
+     based on previous work by: Jesse J. Lipp & Tobias Neumann
     """.stripIndent()
 }
 
@@ -89,13 +78,10 @@ log.info " input directory          : ${params.inputDir}"
 log.info " output directory         : ${params.outputDir}"
 log.info " library file             : ${params.library}"
 log.info " barcode file             : ${params.barcodes}"
-log.info " barcode random (nt)      : ${params.barcode_random_length}"
 log.info " barcode demultiplex (nt) : ${params.barcode_length}"
-log.info " spacer (nt)              : ${params.spacer_length}"
+log.info " spacer (nt)              : ${params.spacer_seq}"
 log.info " demultiplex mismatches   : ${params.barcode_demux_mismatches}"
 log.info " 5' guide padding base    : ${params.padding_beginning}"
-log.info " 3' guide padding base    : ${params.padding_end}"
-log.info " reverse complement       : ${params.reverse_complement}"
 log.info " ======================"
 log.info ""
 
@@ -135,35 +121,10 @@ process bam_to_fastq {
     """
 }
 
-senseFastqFiles = Channel.create()
-antisenseFastqFiles = Channel.create()
-
 fastqFilesFromBam
     .mix(rawFastqFiles)
-    .choice( senseFastqFiles, antisenseFastqFiles ) { params.reverse_complement ? 1 : 0 }
-
-process reverse_complement_fastq {
-
-    tag { lane }
-
-    input:
-    set val(lane), file(fastq) from antisenseFastqFiles
-
-    output:
-    set val(lane), file("${lane}.fastq.gz") into rcfastqFiles
-
-    script:
-    """
-    mv ${fastq} input.fastq.gz
-    zcat input.fastq.gz | fastx_reverse_complement \
-        -z \
-        -o ${lane}.fastq.gz
-    """
-}
-
-senseFastqFiles
-    .mix(rcfastqFiles)
     .set { fastqFiles }
+
 
 process trim_random_barcode {
 
@@ -176,17 +137,14 @@ process trim_random_barcode {
     set val(lane), file("${lane}.fastq.gz") into randomBarcodeTrimmedFiles
 
     script:
-    position = params.barcode_random_length
     """
-    if [[ ${position} -gt 0 ]]
-    then
-      mv ${fastq} input.fastq.gz
-      cutadapt -u ${position} -j ${task.cpus} input.fastq.gz -o ${lane}.fastq.gz
-    else
-      mv ${fastq} input.fastq.gz
-      path_to_file=\$(readlink -f input.fastq.gz)
-      cp \${path_to_file} ${lane}.fastq.gz
-    fi
+    mv ${fastq} input.fastq.gz
+    
+    barcode=\$(printf "%${params.barcode_length}s" | tr ' ' "N")
+    barcode_spacer="\${barcode}${params.spacer_seq}"
+    length_barcode_spacer=\${#barcode_spacer}
+
+    cutadapt -O \${length_barcode_spacer} -g \${barcode_spacer} --action=retain -j ${task.cpus} input.fastq.gz -o ${lane}.fastq.gz
     """
 }
 
@@ -221,7 +179,7 @@ process demultiplex {
     set val(lane), file(files) from demuxFiles
 
     output:
-    set val(lane), file('*.fq.gz') into splitFiles
+    set val(lane), file('*.fq.gz') into splitFiles, splitFilesFastQC
 
     script:
     """
@@ -236,11 +194,16 @@ def ungroupTuple = {
     return result
  }
 
+splitFilesFastQC
+    .flatMap { it -> ungroupTuple(it) }
+    .map { lane, file -> tuple(lane, file.name.replaceAll(/\.fq\.gz/, ''), file) }
+    .set { fastqcSplitFiles }
+
 splitFiles
     .flatMap { it -> ungroupTuple(it) }
     .filter { it[1].baseName =~ /^(?!.*unknown).*$/ }
     .map { lane, file -> tuple(lane, file.name.replaceAll(/\.fq\.gz/, ''), file) }
-    .into { flattenedSplitFiles; fastqcSplitFiles }
+    .set { flattenedSplitFiles }
 
 process trim_barcode_and_spacer {
 
@@ -257,17 +220,13 @@ process trim_barcode_and_spacer {
     set val(lane), val(id), file("${id}.fastq.gz") into spacerTrimmedFiles
 
     script:
-    barcode_spacer_length = params.spacer_length + params.barcode_length
     """
-    str=${id}
-    stagger_length="\$( awk -F 'STAGGERLENGTH' '{print \$2}' <<< \${str})"
-    remove_beginning=\$(expr \${stagger_length} + ${barcode_spacer_length})
+    barcode=\$(printf "%${params.barcode_length}s" | tr ' ' "N")
+    barcode_spacer="\${barcode}${params.spacer_seq}"
+    length_barcode_spacer=\${#barcode_spacer}
 
-    cutadapt ${fastq} -j ${task.cpus} -u \${remove_beginning} -o ${id}_remove_beginning.fastq.gz
-    cutadapt ${id}_remove_beginning.fastq.gz -j ${task.cpus} -l ${params.guide_length} -o ${id}.fastq.gz
-
-    rm ${id}_remove_beginning.fastq.gz
-
+    mv ${fastq} input.fastq.gz
+    cutadapt input.fastq.gz -j ${task.cpus} -u \${length_barcode_spacer} -o ${id}.fastq.gz -l ${params.guide_length}
     fastqc -q ${id}.fastq.gz
     """
 }
@@ -285,7 +244,7 @@ process process_library {
 
     script:
     """
-    process_library.R ${library} ${params.padding_beginning} ${params.padding_end}
+    process_library.R ${library} ${params.padding_beginning}
     """
 }
 
@@ -384,18 +343,12 @@ process combine_counts {
     """
 }
 
-
-fastqcSplitFiles
-    .map { lane, id, file -> tuple(lane, file) }
-    .groupTuple()
-    .set { fastqcSplitFiles }
-
 process fastqc {
 
-    tag { lane }
+    tag { id }
 
     input:
-    set val(lane), file(fastq) from fastqcSplitFiles
+    set val(lane), val(id), file(fastq) from fastqcSplitFiles
 
     output:
     file "*_fastqc.{zip,html}" into fastqcResults

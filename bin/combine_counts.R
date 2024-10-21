@@ -4,9 +4,9 @@
 # combine processed counts by summing counts by sample name across lanes
 # part of CRISPR / shRNA screen pre-processing pipeline
 # 
-# Jesse J. Lipp
+# Jesse J. Lipp & Florian Andersch
 # Institute of Molecular Pathology (IMP), Vienna, Austria
-# 2017/09/20
+# 2024/10/21
 ################################################################################
 
 ### command line parameters
@@ -34,9 +34,7 @@ lapply(count_files, read_featurecounts) %>%
   purrr::map(tidyr::gather, sample_name, count, -id) %>%
   dplyr::bind_rows() %>%
   dplyr::mutate(sample_name = stringr::str_replace_all(sample_name, pattern, "")) %>%
-  #remove stagger length information from sample name
-  dplyr::mutate(sample_name = stringr::str_split(sample_name, "#") %>% lapply("[[", 2) %>% unlist %>%
-                  stringr::str_split("STAGGERLENGTH") %>% lapply("[[", 1) %>% unlist) %>%
+  dplyr::mutate(sample_name = stringr::str_split(sample_name, "#") %>% lapply("[[", 2)) %>%
   dplyr::group_by(id, sample_name) %>%
   dplyr::summarize(count = sum(count)) %>%
   dplyr::ungroup() %>%
