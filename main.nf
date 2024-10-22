@@ -42,7 +42,8 @@ def helpMessage() {
                                     (default: 4)
 
         --spacer_seq                Nucleotide sequence in spacer sequence between
-                                    barcodes and sgRNA / shRNA sequence. (default: TTCCAGCATAGCTCTTAAAC)
+                                    barcodes and sgRNA / shRNA sequence. 
+                                        (default: TTCCAGCATAGCTCTTAAAC)
 
         --guide_length              Number of nucleotides in guide sequence. (default: 21)
 
@@ -50,13 +51,16 @@ def helpMessage() {
                                     unequal length. Must be one of G, C, T, and A.
                                     (default: ACC)
 
+        --add_unknown_to_fastqc     Add unknown sequences (no barcode match during demultiplexing) 
+                                    to multiQC report. (default: false)
+
      Profiles:
         standard                    local execution
-        apptainer                   local execution with apptainer
-        cbe                         SLURM execution with apptainer on CBE cluster
+        singularity                 local execution with singularity
+        cbe                         SLURM execution with singularity on CBE cluster
 
      Docker:
-     zuberlab/crispr-nf:latest
+     zuberlab/crispr-nf:0.6
 
      Author:
      Florian Andersch (florian.andersch@imp.ac.at)
@@ -82,6 +86,8 @@ log.info " barcode demultiplex (nt) : ${params.barcode_length}"
 log.info " spacer (nt)              : ${params.spacer_seq}"
 log.info " demultiplex mismatches   : ${params.barcode_demux_mismatches}"
 log.info " 5' guide padding base    : ${params.padding_beginning}"
+log.info " guide length             : ${params.guide_length}"
+log.info " add unknown to FastQC    : ${params.add_unknown_to_fastqc}"
 log.info " ======================"
 log.info ""
 
@@ -179,7 +185,7 @@ process demultiplex {
     set val(lane), file(files) from demuxFiles
 
     output:
-    set val(lane), file('*.fq.gz') into splitFiles, splitFilesFastQC
+    set val(lane), file('*.fq.gz') into splitFiles
 
     script:
     """
@@ -194,16 +200,14 @@ def ungroupTuple = {
     return result
  }
 
-splitFilesFastQC
-    .flatMap { it -> ungroupTuple(it) }
-    .map { lane, file -> tuple(lane, file.name.replaceAll(/\.fq\.gz/, ''), file) }
-    .set { fastqcSplitFiles }
-
 splitFiles
     .flatMap { it -> ungroupTuple(it) }
-    .filter { it[1].baseName =~ /^(?!.*unknown).*$/ }
     .map { lane, file -> tuple(lane, file.name.replaceAll(/\.fq\.gz/, ''), file) }
-    .set { flattenedSplitFiles }
+    .into { flattenedSplitFilesUnknown; fastqcSplitFilesUnknown }
+
+flattenedSplitFilesUnknown
+    .filter { it =~ /^(?!.*unknown).*$/ }
+    .into { flattenedSplitFiles; fastqcSplitFiles }
 
 process trim_barcode_and_spacer {
 
@@ -342,6 +346,8 @@ process combine_counts {
     combine_counts.R ${library} ${counts} > counts_mageck.txt
     """
 }
+
+fastqcSplitFiles = params.add_unknown_to_fastqc ? fastqcSplitFilesUnknown : fastqcSplitFiles
 
 process fastqc {
 
