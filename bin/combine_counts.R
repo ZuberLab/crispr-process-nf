@@ -28,13 +28,12 @@ library <- readr::read_tsv(library_file) %>%
   dplyr::select(id, group)
 
 names(count_files) <- stringr::str_replace(basename(count_files), ".txt", "")
-pattern <- paste(c(paste0(names(count_files), "_"), ".sam"), collapse = "|")
+pattern <- paste(c(paste0(names(count_files), "#"), "\\.sam"), collapse = "|")
 
 lapply(count_files, read_featurecounts) %>%
   purrr::map(tidyr::gather, sample_name, count, -id) %>%
   dplyr::bind_rows() %>%
   dplyr::mutate(sample_name = stringr::str_replace_all(sample_name, pattern, "")) %>%
-  dplyr::mutate(sample_name = stringr::str_split(sample_name, "#") %>% lapply("[[", 2)) %>%
   dplyr::group_by(id, sample_name) %>%
   dplyr::summarize(count = sum(count)) %>%
   dplyr::ungroup() %>%

@@ -43,13 +43,14 @@ def helpMessage() {
 
         --spacer_seq                Nucleotide sequence in spacer sequence between
                                     barcodes and sgRNA / shRNA sequence. 
-                                        (default: TTCCAGCATAGCTCTTAAAC)
+                                    (default: TTCCAGCATAGCTCTTAAAC)
 
-        --guide_length              Number of nucleotides in guide sequence. (default: 21)
+        --max_guide_length          Number of nucleotides in guide sequence. (default: 21)
 
-        --padding_beginning         Nucleotides used for 5' padding if sgRNA / shRNA are of
-                                    unequal length. Must be one of G, C, T, and A.
-                                    (default: ACC)
+        --padding                   Nucleotides used for padding if sgRNA / shRNA are of
+                                    unequal length. Corresponds to nucleotides downstream of 
+                                    the sgRNA (post guide sequence). Must be one of G, C, T, 
+                                    and A. (default: GTT)
 
         --add_unknown_to_fastqc     Add unknown sequences (no barcode match during demultiplexing) 
                                     to multiQC report. (default: false)
@@ -85,8 +86,8 @@ log.info " barcode file             : ${params.barcodes}"
 log.info " barcode demultiplex (nt) : ${params.barcode_length}"
 log.info " spacer (nt)              : ${params.spacer_seq}"
 log.info " demultiplex mismatches   : ${params.barcode_demux_mismatches}"
-log.info " 5' guide padding base    : ${params.padding_beginning}"
-log.info " guide length             : ${params.guide_length}"
+log.info " guide padding bases      : ${params.padding}"
+log.info " max guide length         : ${params.max_guide_length}"
 log.info " add unknown to FastQC    : ${params.add_unknown_to_fastqc}"
 log.info " ======================"
 log.info ""
@@ -230,7 +231,7 @@ process trim_barcode_and_spacer {
     length_barcode_spacer=\${#barcode_spacer}
 
     mv ${fastq} input.fastq.gz
-    cutadapt input.fastq.gz -j ${task.cpus} -u \${length_barcode_spacer} -o ${id}.fastq.gz -l ${params.guide_length}
+    cutadapt input.fastq.gz -j ${task.cpus} -u \${length_barcode_spacer} -o ${id}.fastq.gz -l ${params.max_guide_length}
     fastqc -q ${id}.fastq.gz
     """
 }
@@ -248,7 +249,7 @@ process process_library {
 
     script:
     """
-    process_library.R ${library} ${params.padding_beginning}
+    process_library.R ${library} ${params.padding}
     """
 }
 
@@ -286,10 +287,11 @@ process align {
     bowtie2 \
         --threads \$((${task.cpus})) \
         -x ${index}/index \
-        -L ${params.guide_length} \
+        -L ${params.max_guide_length} \
         --score-min 'C,0,-1' \
         -N 0 \
         --seed 42 \
+        --norc \
         <(zcat ${fastq}) 2> ${id}.log > ${id}.sam
     """
 }

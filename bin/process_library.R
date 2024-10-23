@@ -17,7 +17,7 @@
 ### command line parameters
 args         <- commandArgs(trailingOnly = TRUE)
 input_file   <- args[1]
-padding_beginning <- toupper(args[2])
+padding <- toupper(args[2])
 library_name <- stringr::str_replace(basename(input_file), ".txt", "")
 
 ### functions
@@ -31,11 +31,18 @@ stopifnot(!any(duplicated(raw$id)))
 stopifnot(!any(duplicated(raw$sequence)))
 
 ### generate fasta file for bowtie2 index
+
+#max guide length + overhang of 1
 seq_length <- max(nchar(raw$sequence))
 
-paste0(padding_beginning, raw$sequence) %>%
+#reverse complement sgRNAs sequence
+raw$sequence_rc <- Biostrings::DNAStringSet(raw$sequence) %>%
+  Biostrings::reverseComplement() %>%
+  as.character()
+
+paste0(raw$sequence_rc, padding) %>%
   toupper %>%
-  stringr::str_sub(start=-23) %>%
+  stringr::str_sub(end=seq_length) %>%
   purrr::set_names(raw$id) %>%
   Biostrings::DNAStringSet() %>%
   Biostrings::writeXStringSet(paste0(library_name, ".fasta"), format = "fasta")
