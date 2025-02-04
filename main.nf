@@ -36,16 +36,18 @@ def helpMessage() {
 
 
         --barcode_demux_mismatches  Number of mismatches allowed during demultiplexing
-                                    of barcode. (default: 0)
+                                    of barcode. (default: 1)
 
-        --barcode_length            Number of nucleotides in sample barcode.
-                                    (default: 4)
+        --random_barcode_length     Number of nucleotides in random barcode.
+                                    (default: 2)
 
         --spacer_seq                Nucleotide sequence in spacer sequence between
                                     barcodes and sgRNA / shRNA sequence. 
                                     (default: TTCCAGCATAGCTCTTAAAC)
 
         --max_guide_length          Number of nucleotides in guide sequence. (default: 21)
+
+        --rc_guide_seq               Reverse complement guide sequence. (default: false)
 
         --padding                   Nucleotides used for padding if sgRNA / shRNA are of
                                     unequal length. Corresponds to nucleotides downstream of 
@@ -79,16 +81,17 @@ if (params.help) {
 log.info ""
 log.info " parameters "
 log.info " ======================"
-log.info " input directory          : ${params.inputDir}"
-log.info " output directory         : ${params.outputDir}"
-log.info " library file             : ${params.library}"
-log.info " barcode file             : ${params.barcodes}"
-log.info " barcode demultiplex (nt) : ${params.barcode_length}"
-log.info " spacer (nt)              : ${params.spacer_seq}"
-log.info " demultiplex mismatches   : ${params.barcode_demux_mismatches}"
-log.info " guide padding bases      : ${params.padding}"
-log.info " max guide length         : ${params.max_guide_length}"
-log.info " add unknown to FastQC    : ${params.add_unknown_to_fastqc}"
+log.info " input directory                      : ${params.inputDir}"
+log.info " output directory                     : ${params.outputDir}"
+log.info " library file                         : ${params.library}"
+log.info " barcode file                         : ${params.barcodes}"
+log.info " random barcode (nt)                  : ${params.random_barcode_length}"
+log.info " spacer (nt)                          : ${params.spacer_seq}"
+log.info " demultiplex mismatches               : ${params.barcode_demux_mismatches}"
+log.info " guide padding bases                  : ${params.padding}"
+log.info " max guide length                     : ${params.max_guide_length}"
+log.info " reverse complement guide sequence    : ${params.rc_guide_seq}"
+log.info " add unknown to FastQC                : ${params.add_unknown_to_fastqc}"
 log.info " ======================"
 log.info ""
 
@@ -105,6 +108,10 @@ Channel
 Channel
     .fromPath(params.barcodes)
     .set { processBarcodeFiles }
+
+Channel
+    .fromPath(params.barcodes)
+    .set { barcodeFile }
 
 Channel
     .fromPath(params.library)
@@ -146,12 +153,9 @@ process trim_random_barcode {
     script:
     """
     mv ${fastq} input.fastq.gz
-    
-    barcode=\$(printf "%${params.barcode_length}s" | tr ' ' "N")
-    barcode_spacer="\${barcode}${params.spacer_seq}"
-    length_barcode_spacer=\${#barcode_spacer}
-
-    cutadapt -O \${length_barcode_spacer} -g \${barcode_spacer} --action=retain -j ${task.cpus} input.fastq.gz -o ${lane}.fastq.gz
+    spacer="${params.spacer_seq}"
+    length_spacer=\${#spacer}
+    cutadapt -u ${params.random_barcode_length} --overlap \${length_spacer} -g ${params.spacer_seq} --action=none -j ${task.cpus} input.fastq.gz -o ${lane}.fastq.gz
     """
 }
 
@@ -220,13 +224,15 @@ process trim_barcode_and_spacer {
 
     input:
     set val(lane), val(id), file(fastq) from flattenedSplitFiles
+    each file(barcodes) from barcodeFile
 
     output:
     set val(lane), val(id), file("${id}.fastq.gz") into spacerTrimmedFiles
 
     script:
+    sample = id.replaceAll(/^.*?#/, '')
     """
-    barcode=\$(printf "%${params.barcode_length}s" | tr ' ' "N")
+    barcode=\$(awk -F'\\t' '\$2 == "${sample}" {print \$3}' ${barcodes})
     barcode_spacer="\${barcode}${params.spacer_seq}"
     length_barcode_spacer=\${#barcode_spacer}
 
@@ -283,6 +289,12 @@ process align {
     file "${id}.log" into alignResults
 
     script:
+    if (params.rc_guide_seq) {
+        rc = "--nofw"
+    } else {
+        rc = "--norc"
+    }
+
     """
     bowtie2 \
         --threads \$((${task.cpus})) \
@@ -291,8 +303,9 @@ process align {
         --score-min 'C,0,-1' \
         -N 0 \
         --seed 42 \
-        --norc \
+        $rc \
         <(zcat ${fastq}) 2> ${id}.log > ${id}.sam
+        
     """
 }
 
