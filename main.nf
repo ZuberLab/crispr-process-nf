@@ -30,8 +30,8 @@ def helpMessage() {
                                     (default: 'barcodes.txt')
                                     The following columns are required:
                                         - lane:         name of BAM / FASTQ input file
-                                        - sample_name:  name of demultiplexed sample 
-                                        - barcode:      sequence of the sample barcode, 
+                                        - sample_name:  name of demultiplexed sample
+                                        - barcode:      sequence of the sample barcode,
                                                         must be unique for each sample
 
 
@@ -42,19 +42,19 @@ def helpMessage() {
                                     (default: 2)
 
         --spacer_seq                Nucleotide sequence in spacer sequence between
-                                    barcodes and sgRNA / shRNA sequence. 
+                                    barcodes and sgRNA / shRNA sequence.
                                     (default: TTCCAGCATAGCTCTTAAAC)
 
         --max_guide_length          Number of nucleotides in guide sequence. (default: 21)
 
-        --rc_guide_seq               Reverse complement guide sequence. (default: false)
+        --rc_guide_seq              Reverse complement guide sequence. (default: false)
 
         --padding                   Nucleotides used for padding if sgRNA / shRNA are of
-                                    unequal length. Corresponds to nucleotides downstream of 
-                                    the sgRNA (post guide sequence). Must be one of G, C, T, 
+                                    unequal length. Corresponds to nucleotides downstream of
+                                    the sgRNA (post guide sequence). Must be one of G, C, T,
                                     and A. (default: GTT)
 
-        --add_unknown_to_fastqc     Add unknown sequences (no barcode match during demultiplexing) 
+        --add_unknown_to_fastqc     Add unknown sequences (no barcode match during demultiplexing)
                                     to multiQC report. (default: false)
 
      Profiles:
@@ -129,9 +129,8 @@ process bam_to_fastq {
 
     script:
     """
-    samtools fastq -@ ${task.cpus} ${bam} -2 read_pairs_not_used.fastq > ${lane}.fastq
-    rm read_pairs_not_used.fastq
-    pigz -p ${task.cpus} ${lane}.fastq
+    samtools fastq -@ ${task.cpus} ${bam} -2 read_pairs_not_used.fastq.gz > ${lane}.fastq.gz
+    rm read_pairs_not_used.fastq.gz
     """
 }
 
@@ -232,7 +231,7 @@ process trim_barcode_and_spacer {
     script:
     sample = id.replaceAll(/^.*?#/, '')
     """
-    barcode=\$(awk -F'\\t' '\$2 == "${sample}" {print \$3}' ${barcodes})
+    barcode=\$(awk -F'\\t' '\$2 == "${sample}" {print \$3}' ${barcodes} | sort | uniq)
     barcode_spacer="\${barcode}${params.spacer_seq}"
     length_barcode_spacer=\${#barcode_spacer}
 
@@ -305,7 +304,7 @@ process align {
         --seed 42 \
         $rc \
         <(zcat ${fastq}) 2> ${id}.log > ${id}.sam
-        
+
     """
 }
 
