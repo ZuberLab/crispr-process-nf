@@ -129,8 +129,9 @@ process bam_to_fastq {
 
     script:
     """
-    samtools fastq -@ ${task.cpus} ${bam} -2 read_pairs_not_used.fastq.gz > ${lane}.fastq.gz
-    rm read_pairs_not_used.fastq.gz
+    samtools fastq -@ ${task.cpus} ${bam} -2 read_pairs_not_used.fastq > ${lane}.fastq
+    rm read_pairs_not_used.fastq
+    pigz -p ${task.cpus} ${lane}.fastq
     """
 }
 
